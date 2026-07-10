@@ -546,19 +546,37 @@
 
   function tryAutoplay(){
     audio.volume = 0.6;
+    // Los navegadores bloquean el autoplay con sonido, pero sí permiten
+    // reproducir en silencio automáticamente. Empezamos muteados y
+    // quitamos el mute en el primer gesto del usuario (tap, scroll, etc).
+    audio.muted = true;
     const p = audio.play();
     if (p !== undefined){
-      p.then(()=> setPlayingUI(true))
+      p.then(()=>{
+          setPlayingUI(true);
+          const unmute = () => {
+            audio.muted = false;
+            ['click','scroll','touchstart','keydown','pointerdown','mousemove'].forEach(ev=>{
+              document.removeEventListener(ev, unmute);
+            });
+          };
+          ['click','scroll','touchstart','keydown','pointerdown','mousemove'].forEach(ev=>{
+            document.addEventListener(ev, unmute, {once:true, passive:true});
+          });
+       })
        .catch(()=>{
-          // Autoplay blocked by browser: wait for first user interaction
+          // Si incluso el autoplay muteado falla, esperamos interacción para reproducir con sonido
           setPlayingUI(false);
           const resume = () => {
+            audio.muted = false;
             audio.play().then(()=>setPlayingUI(true)).catch(()=>{});
-            document.removeEventListener('click', resume);
-            document.removeEventListener('scroll', resume);
+            ['click','scroll','touchstart','keydown','pointerdown'].forEach(ev=>{
+              document.removeEventListener(ev, resume);
+            });
           };
-          document.addEventListener('click', resume, {once:true});
-          document.addEventListener('scroll', resume, {once:true});
+          ['click','scroll','touchstart','keydown','pointerdown'].forEach(ev=>{
+            document.addEventListener(ev, resume, {once:true, passive:true});
+          });
        });
     }
   }
